@@ -7,14 +7,62 @@ export default function SettingsPage() {
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const [editingIdentifiers, setEditingIdentifiers] = useState(false);
+  const [identifierForm, setIdentifierForm] = useState({ slug: '', joinKeyword: '' });
+  const [identifierError, setIdentifierError] = useState('');
+  const [identifierStatus, setIdentifierStatus] = useState('');
+  const [identifierSaving, setIdentifierSaving] = useState(false);
+
   useEffect(() => {
     fetch('/api/company/settings')
       .then((res) => res.json())
-      .then((data) => setForm(data.company));
+      .then((data) => {
+        setForm(data.company);
+        if (data.company) {
+          setIdentifierForm({
+            slug: data.company.slug || '',
+            joinKeyword: data.company.join_keyword || '',
+          });
+        }
+      });
   }, []);
 
   function update(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function startEditIdentifiers() {
+    setIdentifierError('');
+    setIdentifierStatus('');
+    setEditingIdentifiers(true);
+  }
+
+  function cancelEditIdentifiers() {
+    setIdentifierForm({ slug: form.slug || '', joinKeyword: form.join_keyword || '' });
+    setIdentifierError('');
+    setEditingIdentifiers(false);
+  }
+
+  async function saveIdentifiers(e) {
+    e.preventDefault();
+    setIdentifierError('');
+    setIdentifierStatus('');
+    setIdentifierSaving(true);
+    const res = await fetch('/api/company/identifiers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(identifierForm),
+    });
+    const data = await res.json();
+    setIdentifierSaving(false);
+    if (!res.ok) {
+      setIdentifierError(data.error || 'Something went wrong.');
+      return;
+    }
+    setForm((f) => ({ ...f, slug: data.slug, join_keyword: data.join_keyword }));
+    setIdentifierForm({ slug: data.slug, joinKeyword: data.join_keyword });
+    setIdentifierStatus('Saved.');
+    setEditingIdentifiers(false);
   }
 
   async function handleSave(e) {
@@ -52,23 +100,79 @@ export default function SettingsPage() {
           Share either of these with your customers so they can sign themselves up, instead of you
           entering them by hand every time.
         </p>
-        <div className="field">
-          <label>Sign-up link</label>
-          <input
-            readOnly
-            value={typeof window !== 'undefined' ? `${window.location.origin}/join/${form.slug}` : ''}
-            onClick={(e) => e.target.select()}
-          />
-          <p className="field-hint">Share on your website, social media, or a QR code at your shop.</p>
-        </div>
-        <div className="field">
-          <label>Text-to-join keyword</label>
-          <input readOnly value={form.join_keyword || ''} onClick={(e) => e.target.select()} />
-          <p className="field-hint">
-            Customers can text this word to your business's number to opt into text updates
-            themselves — they'll get a disclosure message and reply Y to confirm.
-          </p>
-        </div>
+
+        {editingIdentifiers ? (
+          <form onSubmit={saveIdentifiers}>
+            <div className="field">
+              <label>Sign-up link (goes after coursingonline.com/join/)</label>
+              <input
+                value={identifierForm.slug}
+                onChange={(e) =>
+                  setIdentifierForm((f) => ({ ...f, slug: e.target.value.toLowerCase() }))
+                }
+                placeholder="your-business-name"
+              />
+              <p className="field-hint">Lowercase letters, numbers, and hyphens only.</p>
+            </div>
+            <div className="field">
+              <label>Text-to-join keyword</label>
+              <input
+                value={identifierForm.joinKeyword}
+                onChange={(e) =>
+                  setIdentifierForm((f) => ({ ...f, joinKeyword: e.target.value.toUpperCase() }))
+                }
+                placeholder="YOURBIZ123"
+              />
+              <p className="field-hint">Letters and numbers only, no spaces.</p>
+            </div>
+            <p className="form-error" style={{ marginBottom: 12 }}>
+              If you've already registered a keyword with your SMS carrier (e.g. through a Twilio
+              A2P campaign), changing it here will create a mismatch — the carrier will have a
+              different keyword on file than what your system actually uses. Only change this if
+              you'll also update that registration to match.
+            </p>
+            {identifierError && <p className="form-error">{identifierError}</p>}
+            <button className="btn" style={{ marginRight: 8 }} type="submit" disabled={identifierSaving}>
+              {identifierSaving ? 'Saving…' : 'Save changes'}
+            </button>
+            <button
+              className="btn btn-outline"
+              type="button"
+              onClick={cancelEditIdentifiers}
+              disabled={identifierSaving}
+            >
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <>
+            <div className="field">
+              <label>Sign-up link</label>
+              <input
+                readOnly
+                value={typeof window !== 'undefined' ? `${window.location.origin}/join/${form.slug}` : ''}
+                onClick={(e) => e.target.select()}
+              />
+              <p className="field-hint">Share on your website, social media, or a QR code at your shop.</p>
+            </div>
+            <div className="field">
+              <label>Text-to-join keyword</label>
+              <input readOnly value={form.join_keyword || ''} onClick={(e) => e.target.select()} />
+              <p className="field-hint">
+                Customers can text this word to your business's number to opt into text updates
+                themselves — they'll get a disclosure message and reply Y to confirm.
+              </p>
+            </div>
+            {identifierStatus && (
+              <p className="field-hint" style={{ marginBottom: 12 }}>
+                {identifierStatus}
+              </p>
+            )}
+            <button className="btn btn-outline" onClick={startEditIdentifiers}>
+              Edit link & keyword
+            </button>
+          </>
+        )}
       </div>
 
       <form onSubmit={handleSave}>
