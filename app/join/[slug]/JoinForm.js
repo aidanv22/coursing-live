@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 export default function JoinForm({ slug }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', emailOptIn: true, smsOptIn: false });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', emailOptIn: false, smsOptIn: false });
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [saving, setSaving] = useState(false);
