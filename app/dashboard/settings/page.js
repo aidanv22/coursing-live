@@ -42,7 +42,7 @@ export default function SettingsPage() {
   return (
     <>
       <div className="dash-page-head">
-        <h1>Settings</h1>
+        <h1>Business Information</h1>
       </div>
       <p className="dash-page-sub">Business info and brand voice used to write your campaigns.</p>
 

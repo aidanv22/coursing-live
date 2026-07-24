@@ -9,7 +9,8 @@ const LINKS = [
   { href: '/dashboard/promotions', label: 'Promotions' },
   { href: '/dashboard/customers', label: 'Customers' },
   { href: '/dashboard/campaigns', label: 'Campaigns' },
-  { href: '/dashboard/settings', label: 'Settings' },
+  { href: '/dashboard/settings', label: 'Business Info' },
+  { href: '/dashboard/account', label: 'Account Settings' },
 ];
 
 export default function DashNav({ companyName, isPlatformAdmin }) {
