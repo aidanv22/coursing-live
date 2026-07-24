@@ -8,7 +8,7 @@ export default async function DashboardLayout({ children }) {
 
   return (
     <div className="dash-shell">
-      <DashNav companyName={company.name} />
+      <DashNav companyName={company.name} isPlatformAdmin={company.is_platform_admin} />
       <main className="dash-main">{children}</main>
     </div>
   );

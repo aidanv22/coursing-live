@@ -42,9 +42,14 @@ export default function AdminPage() {
         fontFamily: "'IBM Plex Sans', sans-serif",
       }}
     >
-      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: '1.8rem', marginBottom: 24 }}>
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: '1.8rem', marginBottom: 8 }}>
         Waitlist admin
       </h1>
+      <p style={{ marginBottom: 24 }}>
+        <a href="/admin/companies" style={{ fontSize: 13, color: '#6E6A5F' }}>
+          View all companies using Coursing →
+        </a>
+      </p>
 
       {rows === null && (
         <form onSubmit={handleUnlock} style={{ display: 'flex', gap: 10, maxWidth: 340 }}>

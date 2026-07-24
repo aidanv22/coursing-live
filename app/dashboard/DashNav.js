@@ -12,7 +12,7 @@ const LINKS = [
   { href: '/dashboard/settings', label: 'Settings' },
 ];
 
-export default function DashNav({ companyName }) {
+export default function DashNav({ companyName, isPlatformAdmin }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -35,6 +35,15 @@ export default function DashNav({ companyName }) {
             {link.label}
           </Link>
         ))}
+        {isPlatformAdmin && (
+          <Link
+            href="/dashboard/admin"
+            className={pathname === '/dashboard/admin' ? 'active' : ''}
+            style={{ borderTop: '1px solid rgba(241, 237, 225, 0.15)', marginTop: 6, paddingTop: 16 }}
+          >
+            Admin
+          </Link>
+        )}
       </nav>
       <button className="dash-signout" onClick={handleSignOut}>
         Sign out{companyName ? ` (${companyName})` : ''}
