@@ -60,6 +60,9 @@ export default function LoginPage() {
               placeholder="Your password"
               required
             />
+            <p className="field-hint">
+              <Link href="/forgot-password">Forgot your password?</Link>
+            </p>
           </div>
 
           {error && <p className="form-error">{error}</p>}
