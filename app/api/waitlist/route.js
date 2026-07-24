@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
+import { notifyAdmin } from '@/lib/senders';
 
 // Neon's Vercel integration injects the connection string under
 // DATABASE_URL (sometimes also POSTGRES_URL, depending on integration
@@ -49,6 +50,11 @@ export async function POST(request) {
     `;
 
     const rows = await sql`SELECT COUNT(*)::int AS count FROM waitlist`;
+
+    await notifyAdmin(
+      'New Coursing waitlist signup',
+      `${companyName} just joined the waitlist.\n\nEmail: ${email.toLowerCase()}\nTeam size: ${teamSize || 'not specified'}\nTotal waitlist signups: ${rows[0].count}`
+    );
 
     return NextResponse.json({ ok: true, count: rows[0].count });
   } catch (err) {

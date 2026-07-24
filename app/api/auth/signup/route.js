@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/db';
 import { hashPassword, createSession } from '@/lib/auth';
+import { notifyAdmin } from '@/lib/senders';
 
 export async function POST(request) {
   try {
@@ -39,6 +40,11 @@ export async function POST(request) {
     `;
 
     await createSession(rows[0].id);
+
+    await notifyAdmin(
+      'New Coursing account created',
+      `${name} just created a Coursing account.\n\nEmail: ${email.toLowerCase()}\nWebsite: ${website || 'not provided'}\nPhone: ${phone || 'not provided'}\nService area: ${serviceArea || 'not provided'}`
+    );
 
     return NextResponse.json({ ok: true });
   } catch (err) {
