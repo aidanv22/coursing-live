@@ -66,7 +66,7 @@ export default function SettingsPage() {
           <input readOnly value={form.join_keyword || ''} onClick={(e) => e.target.select()} />
           <p className="field-hint">
             Customers can text this word to your business's number to opt into text updates
-            themselves.
+            themselves — they'll get a disclosure message and reply Y to confirm.
           </p>
         </div>
       </div>
