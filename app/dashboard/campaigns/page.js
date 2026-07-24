@@ -7,6 +7,10 @@ export default function CampaignsPage() {
   const [expanded, setExpanded] = useState(null);
   const [sending, setSending] = useState(null);
   const [sendStatus, setSendStatus] = useState({});
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   async function load() {
     const res = await fetch('/api/company/campaigns');
@@ -30,6 +34,38 @@ export default function CampaignsPage() {
         ? `Sent — ${data.emailsSent} emails, ${data.smsSent} texts${data.failures ? `, ${data.failures} failed` : ''}.`
         : data.error || 'Something went wrong sending.',
     }));
+    load();
+  }
+
+  function startEdit(c) {
+    setEditingId(c.id);
+    setExpanded(c.id);
+    setEditError('');
+    setEditForm({ subject: c.subject, emailBody: c.email_body, smsBody: c.sms_body });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditForm(null);
+    setEditError('');
+  }
+
+  async function saveEdit(id) {
+    setEditSaving(true);
+    setEditError('');
+    const res = await fetch(`/api/company/campaigns/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    });
+    const data = await res.json();
+    setEditSaving(false);
+    if (!res.ok) {
+      setEditError(data.error || 'Something went wrong.');
+      return;
+    }
+    setEditingId(null);
+    setEditForm(null);
     load();
   }
 
@@ -81,12 +117,21 @@ export default function CampaignsPage() {
                       >
                         {expanded === c.id ? 'Hide' : 'Preview'}
                       </button>
+                      {c.status === 'draft' && editingId !== c.id && (
+                        <button
+                          className="btn btn-outline"
+                          style={{ marginRight: 8, fontSize: 13, padding: '6px 12px' }}
+                          onClick={() => startEdit(c)}
+                        >
+                          Edit
+                        </button>
+                      )}
                       {c.status === 'draft' && (
                         <button
                           className="btn btn-patina"
                           style={{ fontSize: 13, padding: '6px 12px' }}
                           onClick={() => handleSend(c.id)}
-                          disabled={sending === c.id}
+                          disabled={sending === c.id || editingId === c.id}
                         >
                           {sending === c.id ? 'Sending…' : 'Send now'}
                         </button>
@@ -96,15 +141,67 @@ export default function CampaignsPage() {
                   {expanded === c.id && (
                     <tr>
                       <td colSpan={5}>
-                        <div className="campaign-preview">
-                          <span className="cp-label">Email</span>
-                          <strong>{c.subject}</strong>
-                          <p style={{ marginTop: 8 }}>{c.email_body}</p>
-                        </div>
-                        <div className="campaign-preview">
-                          <span className="cp-label">SMS</span>
-                          <p>{c.sms_body}</p>
-                        </div>
+                        {editingId === c.id ? (
+                          <div className="campaign-preview">
+                            <div className="field">
+                              <label>Email subject</label>
+                              <input
+                                value={editForm.subject}
+                                onChange={(e) =>
+                                  setEditForm((f) => ({ ...f, subject: e.target.value }))
+                                }
+                              />
+                            </div>
+                            <div className="field">
+                              <label>Email body</label>
+                              <textarea
+                                value={editForm.emailBody}
+                                onChange={(e) =>
+                                  setEditForm((f) => ({ ...f, emailBody: e.target.value }))
+                                }
+                                rows={6}
+                              />
+                            </div>
+                            <div className="field">
+                              <label>SMS text</label>
+                              <textarea
+                                value={editForm.smsBody}
+                                onChange={(e) =>
+                                  setEditForm((f) => ({ ...f, smsBody: e.target.value }))
+                                }
+                                rows={3}
+                              />
+                              <p className="field-hint">
+                                Make sure "Reply STOP to opt out" (or similar) stays in here — it's
+                                required for carrier compliance.
+                              </p>
+                            </div>
+                            {editError && <p className="form-error">{editError}</p>}
+                            <button
+                              className="btn"
+                              style={{ marginRight: 8 }}
+                              onClick={() => saveEdit(c.id)}
+                              disabled={editSaving}
+                            >
+                              {editSaving ? 'Saving…' : 'Save changes'}
+                            </button>
+                            <button className="btn btn-outline" onClick={cancelEdit} disabled={editSaving}>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="campaign-preview">
+                              <span className="cp-label">Email</span>
+                              <strong>{c.subject}</strong>
+                              <p style={{ marginTop: 8 }}>{c.email_body}</p>
+                            </div>
+                            <div className="campaign-preview">
+                              <span className="cp-label">SMS</span>
+                              <p>{c.sms_body}</p>
+                            </div>
+                          </>
+                        )}
                         {sendStatus[c.id] && (
                           <p className="field-hint" style={{ marginTop: 10 }}>
                             {sendStatus[c.id]}
