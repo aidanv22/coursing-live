@@ -288,6 +288,10 @@ export default function Home() {
         <div className="mono">
           AI marketing automation for hardscaping businesses
         </div>
+        <div className="mono" style={{ display: 'flex', gap: 16 }}>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/terms">Terms of Service</a>
+        </div>
       </footer>
     </>
   );

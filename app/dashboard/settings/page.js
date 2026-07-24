@@ -46,6 +46,31 @@ export default function SettingsPage() {
       </div>
       <p className="dash-page-sub">Business info and brand voice used to write your campaigns.</p>
 
+      <div className="dash-card">
+        <h2>How customers opt in</h2>
+        <p className="card-sub">
+          Share either of these with your customers so they can sign themselves up, instead of you
+          entering them by hand every time.
+        </p>
+        <div className="field">
+          <label>Sign-up link</label>
+          <input
+            readOnly
+            value={typeof window !== 'undefined' ? `${window.location.origin}/join/${form.slug}` : ''}
+            onClick={(e) => e.target.select()}
+          />
+          <p className="field-hint">Share on your website, social media, or a QR code at your shop.</p>
+        </div>
+        <div className="field">
+          <label>Text-to-join keyword</label>
+          <input readOnly value={form.join_keyword || ''} onClick={(e) => e.target.select()} />
+          <p className="field-hint">
+            Customers can text this word to your business's number to opt into text updates
+            themselves.
+          </p>
+        </div>
+      </div>
+
       <form onSubmit={handleSave}>
         <div className="dash-card">
           <h2>Business info</h2>
