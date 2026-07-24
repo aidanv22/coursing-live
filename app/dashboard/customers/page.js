@@ -10,6 +10,10 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   async function load() {
     const res = await fetch('/api/company/customers');
@@ -62,6 +66,43 @@ export default function CustomersPage() {
 
   async function handleDelete(id) {
     await fetch(`/api/company/customers/${id}`, { method: 'DELETE' });
+    load();
+  }
+
+  function startEdit(c) {
+    setEditingId(c.id);
+    setEditError('');
+    setEditForm({
+      name: c.name || '',
+      email: c.email || '',
+      phone: c.phone || '',
+      emailOptIn: !!c.email_opt_in,
+      smsOptIn: !!c.sms_opt_in,
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditForm(null);
+    setEditError('');
+  }
+
+  async function saveEdit(id) {
+    setEditSaving(true);
+    setEditError('');
+    const res = await fetch(`/api/company/customers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    });
+    const data = await res.json();
+    setEditSaving(false);
+    if (!res.ok) {
+      setEditError(data.error || 'Something went wrong.');
+      return;
+    }
+    setEditingId(null);
+    setEditForm(null);
     load();
   }
 
@@ -160,20 +201,87 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name || '—'}</td>
-                  <td>{c.email || '—'}</td>
-                  <td>{c.phone || '—'}</td>
-                  <td>{c.email_opt_in ? '✓' : '—'}</td>
-                  <td>{c.sms_opt_in ? '✓' : '—'}</td>
-                  <td>
-                    <button className="btn btn-danger" onClick={() => handleDelete(c.id)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {customers.map((c) =>
+                editingId === c.id ? (
+                  <tr key={c.id}>
+                    <td>
+                      <input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                        style={{ width: '100%' }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                        style={{ width: '100%' }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                        style={{ width: '100%' }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={editForm.emailOptIn}
+                        onChange={(e) => setEditForm((f) => ({ ...f, emailOptIn: e.target.checked }))}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={editForm.smsOptIn}
+                        onChange={(e) => setEditForm((f) => ({ ...f, smsOptIn: e.target.checked }))}
+                      />
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button
+                        className="btn"
+                        style={{ marginRight: 8, fontSize: 13, padding: '6px 12px' }}
+                        onClick={() => saveEdit(c.id)}
+                        disabled={editSaving}
+                      >
+                        {editSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        style={{ fontSize: 13, padding: '6px 12px' }}
+                        onClick={cancelEdit}
+                        disabled={editSaving}
+                      >
+                        Cancel
+                      </button>
+                      {editError && <p className="form-error">{editError}</p>}
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={c.id}>
+                    <td>{c.name || '—'}</td>
+                    <td>{c.email || '—'}</td>
+                    <td>{c.phone || '—'}</td>
+                    <td>{c.email_opt_in ? '✓' : '—'}</td>
+                    <td>{c.sms_opt_in ? '✓' : '—'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button
+                        className="btn btn-outline"
+                        style={{ marginRight: 8, fontSize: 13, padding: '6px 12px' }}
+                        onClick={() => startEdit(c)}
+                      >
+                        Edit
+                      </button>
+                      <button className="btn btn-danger" onClick={() => handleDelete(c.id)}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         )}
