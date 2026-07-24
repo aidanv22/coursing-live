@@ -43,7 +43,9 @@ export async function POST(request) {
   }
 
   if (HELP_WORDS.includes(bodyRaw)) {
-    return twiml('Coursing sends marketing updates on behalf of local service businesses. Reply STOP to unsubscribe.');
+    return twiml(
+      'Coursing: We send marketing updates on behalf of local service businesses you\'ve opted into. Reply STOP to unsubscribe.'
+    );
   }
 
   // Keyword opt-in: texting a company's join keyword (e.g. "STONEWORKS123")
@@ -69,7 +71,9 @@ export async function POST(request) {
       `;
     }
 
-    return twiml(`You're signed up for text updates from ${company.name}. Reply STOP to opt out.`);
+    return twiml(
+      `Coursing: You're now subscribed to updates from ${company.name}. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to cancel.`
+    );
   }
 
   return twiml();
