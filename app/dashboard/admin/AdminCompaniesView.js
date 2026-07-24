@@ -7,6 +7,16 @@ export default function AdminCompaniesView() {
   const [totals, setTotals] = useState(null);
   const [error, setError] = useState('');
 
+  const [requests, setRequests] = useState(null);
+  const [resolving, setResolving] = useState(null);
+  const [resolveError, setResolveError] = useState('');
+
+  async function loadRequests() {
+    const res = await fetch('/api/company/admin/identifier-requests');
+    const data = await res.json();
+    if (res.ok) setRequests(data.requests);
+  }
+
   useEffect(() => {
     fetch('/api/company/admin/companies')
       .then((res) => res.json())
@@ -18,7 +28,25 @@ export default function AdminCompaniesView() {
           setError(data.error || 'Something went wrong.');
         }
       });
+    loadRequests();
   }, []);
+
+  async function resolveRequest(id, action) {
+    setResolving(id);
+    setResolveError('');
+    const res = await fetch(`/api/company/admin/identifier-requests/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json();
+    setResolving(null);
+    if (!res.ok) {
+      setResolveError(data.error || 'Something went wrong.');
+      return;
+    }
+    loadRequests();
+  }
 
   return (
     <>
@@ -26,6 +54,59 @@ export default function AdminCompaniesView() {
         <h1>All companies</h1>
       </div>
       <p className="dash-page-sub">Every business using Coursing, and what they're actually doing with it.</p>
+
+      {requests && requests.length > 0 && (
+        <div className="dash-card">
+          <h2>Pending sign-up link / keyword change requests</h2>
+          <p className="card-sub">
+            Approving a keyword change doesn't update Twilio automatically — update your A2P
+            campaign registration to match before (or right after) approving.
+          </p>
+          {resolveError && <p className="form-error">{resolveError}</p>}
+          <table className="dash-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Current link</th>
+                <th>Requested link</th>
+                <th>Current keyword</th>
+                <th>Requested keyword</th>
+                <th>Requested</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.company_name}</td>
+                  <td>{r.current_slug}</td>
+                  <td><strong>{r.requested_slug}</strong></td>
+                  <td>{r.current_keyword}</td>
+                  <td><strong>{r.requested_keyword}</strong></td>
+                  <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button
+                      className="btn"
+                      style={{ marginRight: 8, fontSize: 13, padding: '6px 12px' }}
+                      onClick={() => resolveRequest(r.id, 'approve')}
+                      disabled={resolving === r.id}
+                    >
+                      {resolving === r.id ? '…' : 'Approve'}
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => resolveRequest(r.id, 'deny')}
+                      disabled={resolving === r.id}
+                    >
+                      Deny
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {error && <p className="form-error">{error}</p>}
       {!error && companies === null && <p className="empty-state">Loading…</p>}

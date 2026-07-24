@@ -9,22 +9,24 @@ export default function SettingsPage() {
 
   const [editingIdentifiers, setEditingIdentifiers] = useState(false);
   const [identifierForm, setIdentifierForm] = useState({ slug: '', joinKeyword: '' });
+  const [pendingRequest, setPendingRequest] = useState(null);
   const [identifierError, setIdentifierError] = useState('');
-  const [identifierStatus, setIdentifierStatus] = useState('');
   const [identifierSaving, setIdentifierSaving] = useState(false);
+
+  async function loadIdentifiers() {
+    const res = await fetch('/api/company/identifiers');
+    const data = await res.json();
+    if (res.ok) {
+      setIdentifierForm({ slug: data.slug || '', joinKeyword: data.joinKeyword || '' });
+      setPendingRequest(data.pendingRequest || null);
+    }
+  }
 
   useEffect(() => {
     fetch('/api/company/settings')
       .then((res) => res.json())
-      .then((data) => {
-        setForm(data.company);
-        if (data.company) {
-          setIdentifierForm({
-            slug: data.company.slug || '',
-            joinKeyword: data.company.join_keyword || '',
-          });
-        }
-      });
+      .then((data) => setForm(data.company));
+    loadIdentifiers();
   }, []);
 
   function update(key, value) {
@@ -33,7 +35,6 @@ export default function SettingsPage() {
 
   function startEditIdentifiers() {
     setIdentifierError('');
-    setIdentifierStatus('');
     setEditingIdentifiers(true);
   }
 
@@ -43,13 +44,12 @@ export default function SettingsPage() {
     setEditingIdentifiers(false);
   }
 
-  async function saveIdentifiers(e) {
+  async function submitIdentifierRequest(e) {
     e.preventDefault();
     setIdentifierError('');
-    setIdentifierStatus('');
     setIdentifierSaving(true);
     const res = await fetch('/api/company/identifiers', {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(identifierForm),
     });
@@ -59,10 +59,15 @@ export default function SettingsPage() {
       setIdentifierError(data.error || 'Something went wrong.');
       return;
     }
-    setForm((f) => ({ ...f, slug: data.slug, join_keyword: data.join_keyword }));
-    setIdentifierForm({ slug: data.slug, joinKeyword: data.join_keyword });
-    setIdentifierStatus('Saved.');
+    setPendingRequest(data.request);
     setEditingIdentifiers(false);
+  }
+
+  async function cancelPendingRequest() {
+    setIdentifierSaving(true);
+    await fetch('/api/company/identifiers', { method: 'DELETE' });
+    setIdentifierSaving(false);
+    setPendingRequest(null);
   }
 
   async function handleSave(e) {
@@ -101,8 +106,26 @@ export default function SettingsPage() {
           entering them by hand every time.
         </p>
 
-        {editingIdentifiers ? (
-          <form onSubmit={saveIdentifiers}>
+        {pendingRequest ? (
+          <>
+            <div className="field">
+              <label>Requested sign-up link</label>
+              <input readOnly value={`.../join/${pendingRequest.requested_slug}`} />
+            </div>
+            <div className="field">
+              <label>Requested keyword</label>
+              <input readOnly value={pendingRequest.requested_keyword} />
+            </div>
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              Submitted {new Date(pendingRequest.created_at).toLocaleDateString()} — waiting on
+              approval. Your current link and keyword still work until this is approved.
+            </p>
+            <button className="btn btn-outline" onClick={cancelPendingRequest} disabled={identifierSaving}>
+              {identifierSaving ? 'Cancelling…' : 'Cancel request'}
+            </button>
+          </>
+        ) : editingIdentifiers ? (
+          <form onSubmit={submitIdentifierRequest}>
             <div className="field">
               <label>Sign-up link (goes after coursingonline.com/join/)</label>
               <input
@@ -125,15 +148,13 @@ export default function SettingsPage() {
               />
               <p className="field-hint">Letters and numbers only, no spaces.</p>
             </div>
-            <p className="form-error" style={{ marginBottom: 12 }}>
-              If you've already registered a keyword with your SMS carrier (e.g. through a Twilio
-              A2P campaign), changing it here will create a mismatch — the carrier will have a
-              different keyword on file than what your system actually uses. Only change this if
-              you'll also update that registration to match.
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              This doesn't change anything right away — it sends a request for approval, since
+              keywords need to be registered with our SMS carrier before they'll work.
             </p>
             {identifierError && <p className="form-error">{identifierError}</p>}
             <button className="btn" style={{ marginRight: 8 }} type="submit" disabled={identifierSaving}>
-              {identifierSaving ? 'Saving…' : 'Save changes'}
+              {identifierSaving ? 'Submitting…' : 'Submit request'}
             </button>
             <button
               className="btn btn-outline"
@@ -150,26 +171,21 @@ export default function SettingsPage() {
               <label>Sign-up link</label>
               <input
                 readOnly
-                value={typeof window !== 'undefined' ? `${window.location.origin}/join/${form.slug}` : ''}
+                value={typeof window !== 'undefined' ? `${window.location.origin}/join/${identifierForm.slug}` : ''}
                 onClick={(e) => e.target.select()}
               />
               <p className="field-hint">Share on your website, social media, or a QR code at your shop.</p>
             </div>
             <div className="field">
               <label>Text-to-join keyword</label>
-              <input readOnly value={form.join_keyword || ''} onClick={(e) => e.target.select()} />
+              <input readOnly value={identifierForm.joinKeyword || ''} onClick={(e) => e.target.select()} />
               <p className="field-hint">
                 Customers can text this word to your business's number to opt into text updates
                 themselves — they'll get a disclosure message and reply Y to confirm.
               </p>
             </div>
-            {identifierStatus && (
-              <p className="field-hint" style={{ marginBottom: 12 }}>
-                {identifierStatus}
-              </p>
-            )}
             <button className="btn btn-outline" onClick={startEditIdentifiers}>
-              Edit link & keyword
+              Request a change
             </button>
           </>
         )}
