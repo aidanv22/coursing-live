@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export default function JoinForm({ slug }) {
+export default function JoinForm({ slug, companyName }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', emailOptIn: false, smsOptIn: false });
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
@@ -11,6 +11,12 @@ export default function JoinForm({ slug }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    if (!form.emailOptIn && !form.smsOptIn) {
+      setError('Please check at least one box below to sign up.');
+      return;
+    }
+
     setSaving(true);
     const res = await fetch(`/api/public/opt-in/${slug}`, {
       method: 'POST',
@@ -60,29 +66,51 @@ export default function JoinForm({ slug }) {
           placeholder="+15551234567"
         />
       </div>
+
       <div className="field">
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 400 }}>
           <input
             type="checkbox"
             checked={form.emailOptIn}
             onChange={(e) => setForm((f) => ({ ...f, emailOptIn: e.target.checked }))}
+            style={{ marginTop: 3 }}
           />
-          Email me updates
+          <span>
+            Yes, I'd like to receive marketing emails from {companyName || 'this business'} about
+            new products, services, and promotions. Message frequency varies, typically up to one
+            email per week and one per month.
+          </span>
         </label>
       </div>
+
       <div className="field">
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 400 }}>
           <input
             type="checkbox"
             checked={form.smsOptIn}
             onChange={(e) => setForm((f) => ({ ...f, smsOptIn: e.target.checked }))}
+            style={{ marginTop: 3 }}
           />
-          Text me updates (message and data rates may apply, reply STOP to opt out)
+          <span>
+            Yes, I'd like to receive text messages from {companyName || 'this business'} about new
+            products, services, and promotions. Message frequency varies, typically up to one text
+            per week and one per month. Message and data rates may apply. Reply HELP for help,
+            STOP to cancel at any time.
+          </span>
         </label>
       </div>
+
+      <p className="field-hint" style={{ marginBottom: 4 }}>
+        By providing your information and checking a box above, you agree to receive messages as
+        described. Consent is not required to make a purchase.
+      </p>
+      <p className="field-hint" style={{ marginBottom: 16 }}>
+        <a href="/terms">Terms of Service</a> · <a href="/privacy">Privacy Policy</a>
+      </p>
+
       {error && <p className="form-error">{error}</p>}
       <button className="btn btn-patina" type="submit" disabled={saving} style={{ width: '100%' }}>
-        {saving ? 'Signing up…' : 'Sign up'}
+        {saving ? 'Signing up…' : 'Yes, sign me up!'}
       </button>
     </form>
   );

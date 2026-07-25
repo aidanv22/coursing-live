@@ -28,7 +28,7 @@ export default async function JoinPage({ params }) {
         <p className="sub">
           Get occasional updates about new products, services, and promotions. Unsubscribe anytime.
         </p>
-        <JoinForm slug={slug} />
+        <JoinForm slug={slug} companyName={company.name} />
       </div>
     </div>
   );

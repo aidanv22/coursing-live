@@ -752,3 +752,12 @@ footer .mono {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Checkbox inputs must never inherit the .field input { width: 100% } rule
+   above — that rule was meant for text/email/etc inputs. Without this
+   override, a checkbox stretches its layout box to fill the container,
+   pushing its label text far to the right of the visible checkbox glyph. */
+.field input[type='checkbox'] {
+  width: auto;
+  flex-shrink: 0;
+}
