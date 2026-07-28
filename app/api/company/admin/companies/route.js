@@ -19,6 +19,7 @@ export async function GET() {
       c.name,
       c.email,
       c.service_area,
+      c.twilio_phone_number,
       c.created_at,
       (SELECT COUNT(*)::int FROM customers cu WHERE cu.company_id = c.id) AS customer_count,
       (SELECT COUNT(*)::int FROM customers cu WHERE cu.company_id = c.id AND cu.email_opt_in) AS email_opt_in_count,

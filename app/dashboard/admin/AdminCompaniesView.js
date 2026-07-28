@@ -11,6 +11,22 @@ export default function AdminCompaniesView() {
   const [resolving, setResolving] = useState(null);
   const [resolveError, setResolveError] = useState('');
 
+  const [editingPhoneFor, setEditingPhoneFor] = useState(null);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+
+  async function loadCompanies() {
+    const res = await fetch('/api/company/admin/companies');
+    const data = await res.json();
+    if (data.companies) {
+      setCompanies(data.companies);
+      setTotals(data.totals);
+    } else {
+      setError(data.error || 'Something went wrong.');
+    }
+  }
+
   async function loadRequests() {
     const res = await fetch('/api/company/admin/identifier-requests');
     const data = await res.json();
@@ -18,16 +34,7 @@ export default function AdminCompaniesView() {
   }
 
   useEffect(() => {
-    fetch('/api/company/admin/companies')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.companies) {
-          setCompanies(data.companies);
-          setTotals(data.totals);
-        } else {
-          setError(data.error || 'Something went wrong.');
-        }
-      });
+    loadCompanies();
     loadRequests();
   }, []);
 
@@ -46,6 +53,30 @@ export default function AdminCompaniesView() {
       return;
     }
     loadRequests();
+  }
+
+  function startEditPhone(company) {
+    setEditingPhoneFor(company.id);
+    setPhoneInput(company.twilio_phone_number || '');
+    setPhoneError('');
+  }
+
+  async function savePhone(id) {
+    setPhoneSaving(true);
+    setPhoneError('');
+    const res = await fetch(`/api/company/admin/companies/${id}/phone`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: phoneInput }),
+    });
+    const data = await res.json();
+    setPhoneSaving(false);
+    if (!res.ok) {
+      setPhoneError(data.error || 'Something went wrong.');
+      return;
+    }
+    setEditingPhoneFor(null);
+    loadCompanies();
   }
 
   return (
@@ -142,6 +173,7 @@ export default function AdminCompaniesView() {
                     <tr>
                       <th>Company</th>
                       <th>Email</th>
+                      <th>Twilio number</th>
                       <th>Customers</th>
                       <th>Email opt-in</th>
                       <th>SMS opt-in</th>
@@ -158,6 +190,41 @@ export default function AdminCompaniesView() {
                       <tr key={c.id}>
                         <td>{c.name}</td>
                         <td>{c.email}</td>
+                        <td style={{ minWidth: 180 }}>
+                          {editingPhoneFor === c.id ? (
+                            <div>
+                              <input
+                                value={phoneInput}
+                                onChange={(e) => setPhoneInput(e.target.value)}
+                                placeholder="+15551234567"
+                                style={{ width: 150, marginBottom: 4 }}
+                              />
+                              <div>
+                                <button
+                                  className="btn"
+                                  style={{ fontSize: 12, padding: '4px 10px', marginRight: 6 }}
+                                  onClick={() => savePhone(c.id)}
+                                  disabled={phoneSaving}
+                                >
+                                  {phoneSaving ? '…' : 'Save'}
+                                </button>
+                                <button
+                                  className="btn btn-outline"
+                                  style={{ fontSize: 12, padding: '4px 10px' }}
+                                  onClick={() => setEditingPhoneFor(null)}
+                                  disabled={phoneSaving}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              {phoneError && <p className="form-error" style={{ marginTop: 4 }}>{phoneError}</p>}
+                            </div>
+                          ) : (
+                            <span onClick={() => startEditPhone(c)} style={{ cursor: 'pointer' }}>
+                              {c.twilio_phone_number || <span className="pill">unassigned</span>}
+                            </span>
+                          )}
+                        </td>
                         <td>{c.customer_count}</td>
                         <td>{c.email_opt_in_count}</td>
                         <td>{c.sms_opt_in_count}</td>

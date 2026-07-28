@@ -45,6 +45,14 @@ export default function DashNav({ companyName, isPlatformAdmin }) {
             Admin
           </Link>
         )}
+        {isPlatformAdmin && (
+          <Link
+            href="/dashboard/admin/toll-free"
+            className={pathname === '/dashboard/admin/toll-free' ? 'active' : ''}
+          >
+            Toll-Free Verification
+          </Link>
+        )}
       </nav>
       <button className="dash-signout" onClick={handleSignOut}>
         Sign out{companyName ? ` (${companyName})` : ''}

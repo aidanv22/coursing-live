@@ -3,11 +3,6 @@ import { sql, ensureSchema } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-// Twilio's own carrier-level Advanced Opt-Out already blocks further sends
-// after a STOP reply, independent of this code. This webhook exists so our
-// own database (and the dashboard's opt-in checkboxes) stay in sync with
-// what actually happened — otherwise the app would keep showing a customer
-// as opted in even though Twilio is silently refusing to deliver to them.
 function twiml(message) {
   return new NextResponse(
     `<?xml version="1.0" encoding="UTF-8"?><Response>${
@@ -24,6 +19,7 @@ export async function POST(request) {
 
   const formData = await request.formData();
   const from = formData.get('From');
+  const to = formData.get('To');
   const bodyRaw = (formData.get('Body') || '').trim().toLowerCase();
 
   if (!from) return twiml();
@@ -33,23 +29,30 @@ export async function POST(request) {
   const HELP_WORDS = ['help', 'info'];
   const CONFIRM_WORDS = ['y', 'yes', 'confirm'];
 
-  // STOP always takes priority, and applies globally for this phone number
-  // across every business it's a customer of — matching how carriers treat
-  // a STOP reply as a blanket opt-out for the sending number, not scoped to
-  // a single conversation.
+  // Each company now has its own dedicated number, so STOP/START/HELP only
+  // apply to whichever specific business's number received this text — not
+  // globally across every business the phone number happens to be a
+  // customer of. Look up that company from the "To" number first.
+  const toCompanyRows = to
+    ? await sql`SELECT id, name FROM companies WHERE twilio_phone_number = ${to}`
+    : [];
+  const toCompany = toCompanyRows[0] || null;
+
   if (STOP_WORDS.includes(bodyRaw)) {
-    await sql`UPDATE customers SET sms_opt_in = FALSE WHERE phone = ${from}`;
+    if (toCompany) {
+      await sql`UPDATE customers SET sms_opt_in = FALSE WHERE phone = ${from} AND company_id = ${toCompany.id}`;
+    } else {
+      // Fallback for a number not yet assigned to a company row (shouldn't
+      // normally happen once set up correctly) — opt out globally as a
+      // safe default rather than doing nothing.
+      await sql`UPDATE customers SET sms_opt_in = FALSE WHERE phone = ${from}`;
+    }
     await sql`DELETE FROM pending_sms_optins WHERE phone = ${from}`;
     // Twilio automatically sends its own carrier-mandated STOP confirmation
     // reply, so we intentionally don't send a second message here.
     return twiml();
   }
 
-  // Step 2 of keyword opt-in: if this phone number has a pending
-  // confirmation waiting, "Y"/"YES"/"CONFIRM" completes it. Checked before
-  // the general START handling below, since a fresh keyword opt-in is the
-  // far more likely reason someone's replying "yes" than an unrelated
-  // request to resume messages.
   if (CONFIRM_WORDS.includes(bodyRaw)) {
     const pending = await sql`
       SELECT p.company_id, c.name
@@ -80,13 +83,14 @@ export async function POST(request) {
         `You're all set! You're subscribed to updates from ${companyName}. Reply STOP anytime to unsubscribe.`
       );
     }
-    // No pending confirmation found (expired or never started) — fall
-    // through to general handling below, since a bare "yes" with nothing
-    // pending isn't a recognized command on its own.
   }
 
   if (START_WORDS.includes(bodyRaw)) {
-    await sql`UPDATE customers SET sms_opt_in = TRUE WHERE phone = ${from}`;
+    if (toCompany) {
+      await sql`UPDATE customers SET sms_opt_in = TRUE WHERE phone = ${from} AND company_id = ${toCompany.id}`;
+    } else {
+      await sql`UPDATE customers SET sms_opt_in = TRUE WHERE phone = ${from}`;
+    }
     return twiml('You are re-subscribed to text updates. Reply STOP at any time to opt out.');
   }
 
@@ -96,11 +100,7 @@ export async function POST(request) {
     );
   }
 
-  // Step 1 of keyword opt-in: texting a company's join keyword (e.g.
-  // "STONEWORKS482") starts the opt-in process. We don't mark them as
-  // opted in yet — that only happens after they reply Y to the disclosure
-  // message below, matching Twilio's required two-step confirmation flow
-  // for text-to-join campaigns.
+  // Keyword opt-in — unchanged, already scoped per-company via join_keyword.
   const keywordMatch = bodyRaw.toUpperCase();
   const companies = await sql`SELECT id, name FROM companies WHERE join_keyword = ${keywordMatch}`;
   const company = companies[0];
