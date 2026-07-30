@@ -57,7 +57,7 @@ export default function AdminCompaniesView() {
 
   function startEditPhone(company) {
     setEditingPhoneFor(company.id);
-    setPhoneInput(company.twilio_phone_number || '');
+    setPhoneInput(company.telnyx_phone_number || '');
     setPhoneError('');
   }
 
@@ -90,8 +90,9 @@ export default function AdminCompaniesView() {
         <div className="dash-card">
           <h2>Pending sign-up link / keyword change requests</h2>
           <p className="card-sub">
-            Approving a keyword change doesn't update Twilio automatically — update your A2P
-            campaign registration to match before (or right after) approving.
+            Approving a keyword change doesn't update Telnyx automatically — update the
+            company's Toll-Free Verification request to match before (or right after)
+            approving.
           </p>
           {resolveError && <p className="form-error">{resolveError}</p>}
           <table className="dash-table">
@@ -173,7 +174,7 @@ export default function AdminCompaniesView() {
                     <tr>
                       <th>Company</th>
                       <th>Email</th>
-                      <th>Twilio number</th>
+                      <th>Telnyx number</th>
                       <th>Customers</th>
                       <th>Email opt-in</th>
                       <th>SMS opt-in</th>
@@ -221,7 +222,7 @@ export default function AdminCompaniesView() {
                             </div>
                           ) : (
                             <span onClick={() => startEditPhone(c)} style={{ cursor: 'pointer' }}>
-                              {c.twilio_phone_number || <span className="pill">unassigned</span>}
+                              {c.telnyx_phone_number || <span className="pill">unassigned</span>}
                             </span>
                           )}
                         </td>

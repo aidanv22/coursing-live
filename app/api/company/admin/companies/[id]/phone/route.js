@@ -25,7 +25,7 @@ export async function PUT(request, { params }) {
 
     if (clean) {
       const taken = await sql`
-        SELECT id FROM companies WHERE twilio_phone_number = ${clean} AND id != ${id}
+        SELECT id FROM companies WHERE telnyx_phone_number = ${clean} AND id != ${id}
       `;
       if (taken.length > 0) {
         return NextResponse.json(
@@ -36,7 +36,7 @@ export async function PUT(request, { params }) {
     }
 
     await sql`
-      UPDATE companies SET twilio_phone_number = ${clean || null} WHERE id = ${id}
+      UPDATE companies SET telnyx_phone_number = ${clean || null} WHERE id = ${id}
     `;
 
     return NextResponse.json({ ok: true });

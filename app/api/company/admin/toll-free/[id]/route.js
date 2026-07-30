@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentCompany } from '@/lib/auth';
-import { listTollFreeVerifications, createTollFreeVerification } from '@/lib/telnyxAdmin';
-
-export const dynamic = 'force-dynamic';
+import { getTollFreeVerification, deleteTollFreeVerification } from '@/lib/telnyxAdmin';
 
 async function requireAdmin() {
   const company = await getCurrentCompany();
@@ -13,36 +11,31 @@ async function requireAdmin() {
   return { company };
 }
 
-export async function GET() {
+export async function GET(request, { params }) {
   const { error } = await requireAdmin();
   if (error) return error;
 
   try {
-    const verifications = await listTollFreeVerifications();
-    return NextResponse.json({
-      verifications: verifications.map((v) => ({
-        id: v.id,
-        businessName: v.businessName,
-        status: v.verificationStatus,
-        phoneNumbers: v.phoneNumbers,
-        reason: v.reason,
-        createdAt: v.createdAt,
-        updatedAt: v.updatedAt,
-      })),
-    });
+    const { id } = await params;
+    const v = await getTollFreeVerification(id);
+    return NextResponse.json({ verification: v });
   } catch (err) {
     return NextResponse.json({ error: String(err.message || err) }, { status: 500 });
   }
 }
 
-export async function POST(request) {
+// Note: unlike Twilio, Telnyx doesn't expose an "edit in place" endpoint for
+// a submitted verification request. To change details, delete the existing
+// request (if it's editable/rejected) and submit a new one via POST
+// /api/company/admin/toll-free instead. See lib/telnyxAdmin.js for details.
+export async function DELETE(request, { params }) {
   const { error } = await requireAdmin();
   if (error) return error;
 
   try {
-    const body = await request.json();
-    const verification = await createTollFreeVerification(body);
-    return NextResponse.json({ ok: true, id: verification.id, status: verification.verificationStatus });
+    const { id } = await params;
+    await deleteTollFreeVerification(id);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: String(err.message || err) }, { status: 500 });
   }

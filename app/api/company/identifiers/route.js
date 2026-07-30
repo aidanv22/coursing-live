@@ -120,7 +120,7 @@ export async function POST(request) {
 
     await notifyAdmin(
       'Coursing: sign-up link / keyword change request',
-      `${company.name} (${company.email}) requested a change:\n\nCurrent sign-up link: ${company.slug}\nRequested sign-up link: ${cleanSlug}\n\nCurrent keyword: ${company.join_keyword}\nRequested keyword: ${cleanKeyword}\n\nReview and approve/deny in the admin dashboard. Remember: approving a keyword change means updating your Twilio A2P campaign registration to match before the company starts using it.`
+      `${company.name} (${company.email}) requested a change:\n\nCurrent sign-up link: ${company.slug}\nRequested sign-up link: ${cleanSlug}\n\nCurrent keyword: ${company.join_keyword}\nRequested keyword: ${cleanKeyword}\n\nReview and approve/deny in the admin dashboard. Remember: approving a keyword change means updating your Telnyx Toll-Free Verification request to match before the company starts using it.`
     );
 
     return NextResponse.json({ ok: true, request: rows[0] });
