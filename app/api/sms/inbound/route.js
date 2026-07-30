@@ -1,40 +1,110 @@
 import { NextResponse } from 'next/server';
+import nacl from 'tweetnacl';
 import { sql, ensureSchema } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-function twiml(message) {
-  return new NextResponse(
-    `<?xml version="1.0" encoding="UTF-8"?><Response>${
-      message ? `<Message>${message}</Message>` : ''
-    }</Response>`,
-    { headers: { 'Content-Type': 'text/xml' } }
-  );
+const PENDING_TTL_MINUTES = 15;
+
+// Telnyx signs webhooks with Ed25519 (public-key signing, not HMAC like
+// Twilio's X-Twilio-Signature). The signed message is `${timestamp}|${rawBody}`,
+// and the signature + timestamp arrive as headers. Verify against your
+// account's public key (Portal > Account Settings > Keys & Credentials >
+// Public Key), stored in TELNYX_PUBLIC_KEY.
+// Docs: https://support.telnyx.com/en/articles/4334722-how-to-leverage-webhooks
+function verifyTelnyxSignature(rawBody, signatureHeader, timestampHeader) {
+  const publicKeyB64 = process.env.TELNYX_PUBLIC_KEY;
+  if (!publicKeyB64) {
+    // Fail closed — refuse to process unverifiable webhooks rather than
+    // silently skipping verification.
+    throw new Error('TELNYX_PUBLIC_KEY is not configured; cannot verify webhook signature.');
+  }
+  if (!signatureHeader || !timestampHeader) return false;
+
+  // Reject stale requests (replay protection) — 5 minute tolerance.
+  const timestampSeconds = parseInt(timestampHeader, 10);
+  if (!Number.isFinite(timestampSeconds)) return false;
+  const ageSeconds = Math.abs(Date.now() / 1000 - timestampSeconds);
+  if (ageSeconds > 300) return false;
+
+  const message = `${timestampHeader}|${rawBody}`;
+  const signature = Buffer.from(signatureHeader, 'base64');
+  const publicKey = Buffer.from(publicKeyB64, 'base64');
+  const messageBytes = Buffer.from(message, 'utf8');
+
+  return nacl.sign.detached.verify(messageBytes, signature, publicKey);
 }
 
-const PENDING_TTL_MINUTES = 15;
+async function sendReply({ to, from, text }) {
+  if (!process.env.TELNYX_API_KEY || !process.env.TELNYX_MESSAGING_PROFILE_ID) {
+    // Not fatal — inbound processing (opt-in/opt-out state) still succeeds
+    // even if we can't send a confirmation reply back.
+    return;
+  }
+  try {
+    await fetch('https://api.telnyx.com/v2/messages', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.TELNYX_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to,
+        from,
+        text,
+        messaging_profile_id: process.env.TELNYX_MESSAGING_PROFILE_ID,
+      }),
+    });
+  } catch {
+    // Swallowed intentionally — a failed reply shouldn't fail the webhook.
+  }
+}
 
 export async function POST(request) {
   await ensureSchema();
 
-  const formData = await request.formData();
-  const from = formData.get('From');
-  const to = formData.get('To');
-  const bodyRaw = (formData.get('Body') || '').trim().toLowerCase();
+  const rawBody = await request.text();
 
-  if (!from) return twiml();
+  let verified;
+  try {
+    verified = verifyTelnyxSignature(
+      rawBody,
+      request.headers.get('telnyx-signature-ed25519'),
+      request.headers.get('telnyx-timestamp')
+    );
+  } catch (err) {
+    return NextResponse.json({ error: String(err.message || err) }, { status: 500 });
+  }
+  if (!verified) {
+    return NextResponse.json({ error: 'Invalid signature.' }, { status: 401 });
+  }
+
+  const payload = JSON.parse(rawBody);
+  const eventType = payload?.data?.event_type;
+
+  // Only inbound message events carry the fields this handler cares about.
+  if (eventType !== 'message.received') {
+    return NextResponse.json({ ok: true });
+  }
+
+  const msg = payload.data.payload;
+  const from = msg?.from?.phone_number;
+  const to = msg?.to?.[0]?.phone_number;
+  const bodyRaw = (msg?.text || '').trim().toLowerCase();
+
+  if (!from) return NextResponse.json({ ok: true });
 
   const STOP_WORDS = ['stop', 'stopall', 'unsubscribe', 'cancel', 'end', 'quit'];
   const START_WORDS = ['start', 'unstop'];
   const HELP_WORDS = ['help', 'info'];
   const CONFIRM_WORDS = ['y', 'yes', 'confirm'];
 
-  // Each company now has its own dedicated number, so STOP/START/HELP only
+  // Each company has its own dedicated number, so STOP/START/HELP only
   // apply to whichever specific business's number received this text — not
   // globally across every business the phone number happens to be a
   // customer of. Look up that company from the "To" number first.
   const toCompanyRows = to
-    ? await sql`SELECT id, name FROM companies WHERE twilio_phone_number = ${to}`
+    ? await sql`SELECT id, name FROM companies WHERE telnyx_phone_number = ${to}`
     : [];
   const toCompany = toCompanyRows[0] || null;
 
@@ -48,9 +118,11 @@ export async function POST(request) {
       await sql`UPDATE customers SET sms_opt_in = FALSE WHERE phone = ${from}`;
     }
     await sql`DELETE FROM pending_sms_optins WHERE phone = ${from}`;
-    // Twilio automatically sends its own carrier-mandated STOP confirmation
-    // reply, so we intentionally don't send a second message here.
-    return twiml();
+    // Unlike Twilio, Telnyx does not automatically send a carrier-mandated
+    // STOP confirmation reply on your behalf — send one explicitly so
+    // customers still get the required opt-out acknowledgment.
+    if (to) await sendReply({ to: from, from: to, text: 'You have been unsubscribed and will not receive any more messages. Reply START to resubscribe.' });
+    return NextResponse.json({ ok: true });
   }
 
   if (CONFIRM_WORDS.includes(bodyRaw)) {
@@ -79,9 +151,14 @@ export async function POST(request) {
 
       await sql`DELETE FROM pending_sms_optins WHERE phone = ${from}`;
 
-      return twiml(
-        `You're all set! You're subscribed to updates from ${companyName}. Reply STOP anytime to unsubscribe.`
-      );
+      if (to) {
+        await sendReply({
+          to: from,
+          from: to,
+          text: `You're all set! You're subscribed to updates from ${companyName}. Reply STOP anytime to unsubscribe.`,
+        });
+      }
+      return NextResponse.json({ ok: true });
     }
   }
 
@@ -91,13 +168,19 @@ export async function POST(request) {
     } else {
       await sql`UPDATE customers SET sms_opt_in = TRUE WHERE phone = ${from}`;
     }
-    return twiml('You are re-subscribed to text updates. Reply STOP at any time to opt out.');
+    if (to) await sendReply({ to: from, from: to, text: 'You are re-subscribed to text updates. Reply STOP at any time to opt out.' });
+    return NextResponse.json({ ok: true });
   }
 
   if (HELP_WORDS.includes(bodyRaw)) {
-    return twiml(
-      "Coursing: We send marketing updates on behalf of local service businesses you've opted into. Reply STOP to unsubscribe."
-    );
+    if (to) {
+      await sendReply({
+        to: from,
+        from: to,
+        text: "Coursing: We send marketing updates on behalf of local service businesses you've opted into. Reply STOP to unsubscribe.",
+      });
+    }
+    return NextResponse.json({ ok: true });
   }
 
   // Keyword opt-in — unchanged, already scoped per-company via join_keyword.
@@ -112,10 +195,14 @@ export async function POST(request) {
       ON CONFLICT (phone) DO UPDATE SET company_id = EXCLUDED.company_id, created_at = NOW()
     `;
 
-    return twiml(
-      `Coursing: You'll get updates from ${company.name}. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to cancel. Terms: www.coursingonline.com/terms Privacy: www.coursingonline.com/privacy. Reply Y to confirm.`
-    );
+    if (to) {
+      await sendReply({
+        to: from,
+        from: to,
+        text: `Coursing: You'll get updates from ${company.name}. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to cancel. Terms: www.coursingonline.com/terms Privacy: www.coursingonline.com/privacy. Reply Y to confirm.`,
+      });
+    }
   }
 
-  return twiml();
+  return NextResponse.json({ ok: true });
 }

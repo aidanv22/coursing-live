@@ -29,7 +29,7 @@ weekly/monthly cron schedule.
 ## Tech stack
 
 Next.js (App Router) + Neon Postgres (via Vercel Marketplace) + Vercel
-hosting + Vercel Cron, Claude API for copywriting, Resend for email, Twilio
+hosting + Vercel Cron, Claude API for copywriting, Resend for email, Telnyx
 for SMS.
 
 ## Setup
@@ -50,9 +50,11 @@ Vercel (Project Settings → Environment Variables) for production.
   plenty to start. Verify your own sending domain there when you're ready to
   send as a custom "from" address (until then it falls back to Resend's
   shared testing domain).
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` — from
-  [twilio.com](https://twilio.com). You'll need a Twilio phone number capable
-  of sending SMS.
+- `TELNYX_API_KEY`, `TELNYX_MESSAGING_PROFILE_ID`, `TELNYX_PUBLIC_KEY` — from
+  [telnyx.com](https://telnyx.com). You'll need a Telnyx toll-free number
+  capable of sending SMS, assigned to a Messaging Profile. `TELNYX_PUBLIC_KEY`
+  is your account's Ed25519 public key (Portal → Account Settings → Keys &
+  Credentials → Public Key), used to verify inbound webhook signatures.
 - `CRON_SECRET` — optional but recommended once this is live, so random
   people on the internet can't hit your cron endpoints and force-send
   campaigns. Set the same value in Vercel's Cron Secret setting.
@@ -89,7 +91,7 @@ the jobs don't seem to be firing.
 ## Known rough edges (fine for a pilot, worth tightening before scaling)
 
 - No email/SMS unsubscribe link yet — before sending to real customers who
-  didn't explicitly opt in through you, add one (Resend and Twilio both
+  didn't explicitly opt in through you, add one (Resend and Telnyx both
   support this, and it's a legal requirement — CAN-SPAM / TCPA — not just a
   nice-to-have).
 - No password reset flow — if a company forgets their password, you'd need
