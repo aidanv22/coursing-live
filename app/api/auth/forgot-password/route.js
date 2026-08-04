@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/db';
 import { generatePasswordResetToken } from '@/lib/auth';
-import { sendTransactionalEmail } from '@/lib/senders';
+import { sendTransactionalEmail, appUrl } from '@/lib/senders';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function POST(request) {
     // Coursing accounts.
     if (company) {
       const token = await generatePasswordResetToken(company.id);
-      const resetUrl = `${process.env.APP_URL || ''}/reset-password?token=${token}`;
+      const resetUrl = `${appUrl()}/reset-password?token=${token}`;
 
       try {
         await sendTransactionalEmail({
@@ -38,6 +38,7 @@ export async function POST(request) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    console.error('forgot-password error:', err);
     return NextResponse.json({ ok: true }); // still don't leak details on error
   }
 }
