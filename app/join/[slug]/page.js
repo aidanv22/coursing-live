@@ -11,11 +11,20 @@ export default async function JoinPage({ params }) {
   const company = rows[0];
 
   if (!company) {
+    // TEMPORARY DEBUG — remove once the slug lookup mismatch is diagnosed.
+    const debugInfo = {
+      receivedSlug: slug,
+      receivedSlugLength: slug ? slug.length : null,
+      receivedSlugCharCodes: slug ? Array.from(slug).map((c) => c.charCodeAt(0)) : null,
+    };
     return (
       <div className="auth-shell">
         <div className="auth-card" style={{ textAlign: 'center' }}>
           <h1>Link not found</h1>
           <p className="sub">This sign-up link isn't valid. Double check the link and try again.</p>
+          <pre style={{ textAlign: 'left', fontSize: 11, background: '#f4f0e6', padding: 12, marginTop: 20, overflowX: 'auto' }}>
+            {JSON.stringify(debugInfo, null, 2)}
+          </pre>
         </div>
       </div>
     );

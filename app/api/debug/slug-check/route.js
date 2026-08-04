@@ -14,8 +14,16 @@ export async function GET() {
 
   let rows = [];
   let error = null;
+  let exactMatchTest = null;
   try {
     rows = await sql`SELECT id, name, slug, length(slug) as slug_length FROM companies ORDER BY id`;
+    // Replicate the *exact* query app/join/[slug]/page.js runs, with the
+    // exact slug string, to rule out any difference between this
+    // unfiltered SELECT and the actual parameterized lookup the join page
+    // performs.
+    const testSlug = 'ultimate-stone-solutions';
+    const matchRows = await sql`SELECT id, name, slug FROM companies WHERE slug = ${testSlug}`;
+    exactMatchTest = { testSlug, matchCount: matchRows.length, matchRows };
   } catch (err) {
     error = String(err.message || err);
   }
@@ -24,5 +32,6 @@ export async function GET() {
     dbHost,
     error,
     companies: rows,
+    exactMatchTest,
   });
 }
